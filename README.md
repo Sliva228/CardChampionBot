@@ -13,7 +13,7 @@
 
 1. Клонируйте репозиторий:
    ```bash
-   git clone https://github.com/ваш_пользователь/CardChampion.git
+   git clone https://github.com/sliva228/CardChampionBot.git
    ```
 2. Установите необходимые зависимости:
    ```bash
