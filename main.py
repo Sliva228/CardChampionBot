@@ -1,6 +1,6 @@
 import os
 import random
-import sqlite3
+import aiosqlite
 from aiogram import Bot, Dispatcher, types, Router, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
@@ -44,63 +44,63 @@ def create_deck():
     return deck
 
 # Подключение к базе данных
-def create_connection():
-    conn = sqlite3.connect('bot_database.db')
-    return conn
+async def create_connection():
+    return await aiosqlite.connect('bot_database.db')
+
 
 # Создание таблицы пользователей
-def create_table():
-    conn = create_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY,
-            username TEXT,
-            games INTEGER DEFAULT 0,
-            wins INTEGER DEFAULT 0,
-            losses INTEGER DEFAULT 0,
-            ties INTEGER DEFAULT 0
-
-        )
-    ''')
-    conn.commit()
-    conn.close()
+async def create_table():
+    conn = await create_connection()
+    async with conn.cursor() as cursor:
+        await cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY,
+                username TEXT,
+                games INTEGER DEFAULT 0,
+                wins INTEGER DEFAULT 0,
+                losses INTEGER DEFAULT 0,
+                ties INTEGER DEFAULT 0,
+                balance INTEGER DEFAULT 1000 -- Начальный баланс 1000 единиц
+            )
+        ''')
+        await conn.commit()
 
 create_table()
 
 # Получение статистики пользователя
-def get_user_stats(user_id):
-    conn = create_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return {
-            'games': row[2],
-            'wins': row[3],
-            'losses': row[4],
-            'ties': row[5],
-            'username': row[1]
-        }
-    return {'games': 0, 'wins': 0, 'losses': 0, 'ties': 0, 'username': None}
+async def get_user_stats(user_id):
+    conn = await create_connection()
+    async with conn.cursor() as cursor:
+        await cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))
+        row = await cursor.fetchone()
+        if row:
+            return {
+                'games': row[2],
+                'wins': row[3],
+                'losses': row[4],
+                'ties': row[5],
+                'username': row[1],
+                'balance': row[6]  # Добавляем баланс
+            }
+    return {'games': 0, 'wins': 0, 'losses': 0, 'ties': 0, 'username': None, 'balance': 1000}
+
 
 # Сохранение или обновление статистики пользователя
-def save_user_stats(user_id, stats):
-    conn = create_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO users (id, username, games, wins, losses, ties)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-        username = excluded.username,
-        games = excluded.games,
-        wins = excluded.wins,
-        losses = excluded.losses,
-        ties = excluded.ties
-    ''', (user_id, stats['username'], stats['games'], stats['wins'], stats['losses'], stats['ties']))
-    conn.commit()
-    conn.close()
+async def save_user_stats(user_id, stats):
+    conn = await create_connection()
+    async with conn.cursor() as cursor:
+        await cursor.execute('''
+            INSERT INTO users (id, username, games, wins, losses, ties, balance)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                username = excluded.username,
+                games = excluded.games,
+                wins = excluded.wins,
+                losses = excluded.losses,
+                ties = excluded.ties,
+                balance = excluded.balance
+        ''', (user_id, stats['username'], stats['games'], stats['wins'], stats['losses'], stats['ties'], stats['balance']))
+        await conn.commit()
 
 # Главное меню
 def main_menu():
